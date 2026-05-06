@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Barang } from "@/data/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,6 +55,20 @@ export function FormBarang({
   const [lokasi, setLokasi] = useState(initial?.lokasi ?? "")
   const [tanggalMasuk, setTanggalMasuk] = useState(initial?.tanggalMasuk ?? "")
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (open) {
+      setNama(initial?.nama ?? "")
+      setKategori(initial?.kategori ?? "")
+      setStok(initial?.stok ?? 0)
+      setSatuan(initial?.satuan ?? "")
+      setHarga(initial?.harga ?? 0)
+      setDeskripsi(initial?.deskripsi ?? "")
+      setLokasi(initial?.lokasi ?? "")
+      setTanggalMasuk(initial?.tanggalMasuk ?? "")
+      setErrors({})
+    }
+  }, [open, initial])
 
   const validate = (): boolean => {
     const e: Record<string, string> = {}
