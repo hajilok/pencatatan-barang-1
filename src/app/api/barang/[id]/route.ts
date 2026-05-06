@@ -103,6 +103,16 @@ export async function DELETE(
       return NextResponse.json({ error: "Barang tidak ditemukan" }, { status: 404 })
     }
 
+    await db.aktivitas.create({
+      data: {
+        barangId: null,
+        barangNama: existing.nama,
+        aksi: "Barang Dihapus",
+        jumlah: existing.stok,
+        keterangan: `Barang "${existing.nama}" (${existing.kode}) dihapus dari inventaris`,
+      },
+    })
+
     await db.barang.delete({ where: { id } })
 
     return NextResponse.json({ success: true })

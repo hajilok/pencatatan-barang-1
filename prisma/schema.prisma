@@ -31,11 +31,11 @@ model Kategori {
 
 model Aktivitas {
   id         String   @id @default(uuid())
-  barangId   String
+  barangId   String?
   barangNama String
   aksi       String
   jumlah     Int
   tanggal    DateTime @default(now())
   keterangan String   @default("")
-  barang     Barang   @relation(fields: [barangId], references: [id], onDelete: Cascade)
+  barang     Barang?  @relation(fields: [barangId], references: [id], onDelete: SetNull)
 }

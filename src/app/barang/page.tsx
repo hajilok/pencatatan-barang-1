@@ -174,7 +174,7 @@ function BarangContent() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={filterKategori} onValueChange={setFilterKategori}>
+        <Select value={filterKategori || "semua"} onValueChange={(v) => setFilterKategori(v === "semua" ? "" : v)}>
           <SelectTrigger className="w-full sm:w-40">
             <Filter className="h-4 w-4" />
             <SelectValue placeholder="Kategori" />
@@ -186,7 +186,7 @@ function BarangContent() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <Select value={filterStatus || "semua"} onValueChange={(v) => setFilterStatus(v === "semua" ? "" : v)}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
