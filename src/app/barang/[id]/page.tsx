@@ -2,11 +2,12 @@
 
 import { use, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useBarangStore } from "@/data/store"
+import { useBarangDetail, updateBarang, deleteBarang } from "@/hooks/use-barang"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Barang } from "@/data/types"
 import {
   FormBarang,
@@ -21,6 +22,7 @@ import {
   Tag,
   Hash,
   Banknote,
+  AlertTriangle,
 } from "lucide-react"
 
 const statusVariant: Record<Barang["status"], "success" | "warning" | "destructive"> = {
@@ -53,17 +55,57 @@ export default function BarangDetailPage({
 }) {
   const { id } = use(params)
   const router = useRouter()
-  const store = useBarangStore()
-  const barang = store.getBarang(id)
+  const { barang, isLoading, isError, error } = useBarangDetail(id)
   const [editOpen, setEditOpen] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  if (!barang) {
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-9 w-9 rounded-md" />
+          <div>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-20 mt-1" />
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+            <CardContent className="space-y-4">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-6 w-full" />
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><Skeleton className="h-5 w-24" /></CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  if (isError || !barang) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <Package className="h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-xl font-bold">Barang Tidak Ditemukan</h1>
+        {error ? (
+          <>
+            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+            <h1 className="text-xl font-bold">Gagal Memuat Data</h1>
+          </>
+        ) : (
+          <>
+            <Package className="h-16 w-16 text-muted-foreground mb-4" />
+            <h1 className="text-xl font-bold">Barang Tidak Ditemukan</h1>
+          </>
+        )}
         <p className="text-muted-foreground text-sm mb-4">
-          Barang dengan ID tersebut tidak tersedia.
+          {error ? "Terjadi kesalahan saat mengambil data." : "Barang dengan ID tersebut tidak tersedia."}
         </p>
         <Button onClick={() => router.push("/barang")}>
           <ArrowLeft className="h-4 w-4" />
@@ -73,14 +115,28 @@ export default function BarangDetailPage({
     )
   }
 
-  const handleEdit = (data: Parameters<typeof store.addBarang>[0]) => {
-    store.updateBarang(barang.id, data)
-    setEditOpen(false)
+  const handleEdit = async (data: Parameters<typeof updateBarang>[1]) => {
+    setActionLoading(true)
+    try {
+      await updateBarang(barang.id, data)
+      setEditOpen(false)
+    } catch {
+      alert("Gagal mengupdate barang. Silakan coba lagi.")
+    } finally {
+      setActionLoading(false)
+    }
   }
 
-  const handleDelete = () => {
-    store.deleteBarang(barang.id)
-    router.push("/barang")
+  const handleDelete = async () => {
+    setActionLoading(true)
+    try {
+      await deleteBarang(barang.id)
+      router.push("/barang")
+    } catch {
+      alert("Gagal menghapus barang. Silakan coba lagi.")
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   const totalNilai = barang.harga * barang.stok
@@ -188,11 +244,11 @@ export default function BarangDetailPage({
             </div>
             <Separator />
             <div className="flex flex-col gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} disabled={actionLoading}>
                 <Pencil className="h-4 w-4" />
                 Edit Barang
               </Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete}>
+              <Button variant="destructive" size="sm" onClick={handleDelete} disabled={actionLoading}>
                 <Trash2 className="h-4 w-4" />
                 Hapus Barang
               </Button>

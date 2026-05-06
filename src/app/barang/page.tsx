@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useBarangStore } from "@/data/store"
+import { useBarangList, createBarang, updateBarang, deleteBarang } from "@/hooks/use-barang"
 import { Barang } from "@/data/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Plus,
   Search,
@@ -38,6 +39,7 @@ import {
   PackageOpen,
   Filter,
   ArrowUpDown,
+  AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
 import { FormBarangData, FormBarang } from "./form-barang"
@@ -54,57 +56,30 @@ const statusList: Barang["status"][] = ["Tersedia", "Menipis", "Habis"]
 function BarangContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const store = useBarangStore()
 
   const [search, setSearch] = useState("")
-  const [filterKategori, setFilterKategori] = useState<string>("semua")
-  const [filterStatus, setFilterStatus] = useState<string>("semua")
-  const [sortField, setSortField] = useState<keyof Barang>("nama")
+  const [filterKategori, setFilterKategori] = useState<string>("")
+  const [filterStatus, setFilterStatus] = useState<string>("")
+  const [sortField, setSortField] = useState<string>("nama")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
 
   const [dialogOpen, setDialogOpen] = useState(searchParams.get("tambah") === "true")
   const [editItem, setEditItem] = useState<Barang | undefined>(undefined)
   const [deleteConfirm, setDeleteConfirm] = useState<Barang | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  const filtered = useMemo(() => {
-    let result = [...store.barang]
+  const query = useMemo(() => ({
+    search: search || undefined,
+    kategori: filterKategori || undefined,
+    status: filterStatus || undefined,
+    sortBy: sortField,
+    sortDir: sortDir,
+  }), [search, filterKategori, filterStatus, sortField, sortDir])
 
-    if (search) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (b) =>
-          b.nama.toLowerCase().includes(q) ||
-          b.kode.toLowerCase().includes(q) ||
-          b.kategori.toLowerCase().includes(q) ||
-          b.lokasi.toLowerCase().includes(q)
-      )
-    }
-
-    if (filterKategori !== "semua") {
-      result = result.filter((b) => b.kategori === filterKategori)
-    }
-
-    if (filterStatus !== "semua") {
-      result = result.filter((b) => b.status === filterStatus)
-    }
-
-    result.sort((a, b) => {
-      const aVal = a[sortField]
-      const bVal = b[sortField]
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
-      }
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return sortDir === "asc" ? aVal - bVal : bVal - aVal
-      }
-      return 0
-    })
-
-    return result
-  }, [store.barang, search, filterKategori, filterStatus, sortField, sortDir])
+  const { barang, isLoading, isError } = useBarangList(query)
 
   const toggleSort = useCallback(
-    (field: keyof Barang) => {
+    (field: string) => {
       if (sortField === field) {
         setSortDir((d) => (d === "asc" ? "desc" : "asc"))
       } else {
@@ -116,23 +91,39 @@ function BarangContent() {
   )
 
   const handleSave = useCallback(
-    (data: FormBarangData) => {
-      if (editItem) {
-        store.updateBarang(editItem.id, data)
+    async (data: FormBarangData) => {
+      setActionLoading(true)
+      try {
+        if (editItem) {
+          await updateBarang(editItem.id, data)
+        } else {
+          await createBarang(data)
+        }
         setEditItem(undefined)
-      } else {
-        store.addBarang(data)
+        setDialogOpen(false)
+        router.replace("/barang")
+      } catch {
+        alert("Gagal menyimpan data. Silakan coba lagi.")
+      } finally {
+        setActionLoading(false)
       }
     },
-    [editItem, store]
+    [editItem, router]
   )
 
   const handleDelete = useCallback(
-    (item: Barang) => {
-      store.deleteBarang(item.id)
-      setDeleteConfirm(null)
+    async (item: Barang) => {
+      setActionLoading(true)
+      try {
+        await deleteBarang(item.id)
+        setDeleteConfirm(null)
+      } catch {
+        alert("Gagal menghapus barang. Silakan coba lagi.")
+      } finally {
+        setActionLoading(false)
+      }
     },
-    [store]
+    []
   )
 
   const openEdit = (item: Barang) => {
@@ -145,6 +136,19 @@ function BarangContent() {
     setDialogOpen(true)
   }
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+        <h1 className="text-xl font-bold">Gagal Memuat Data</h1>
+        <p className="text-muted-foreground text-sm mb-4">
+          Terjadi kesalahan saat mengambil data barang.
+        </p>
+        <Button onClick={() => window.location.reload()}>Coba Lagi</Button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -154,7 +158,7 @@ function BarangContent() {
             Kelola data inventaris barang
           </p>
         </div>
-        <Button onClick={openAdd}>
+        <Button onClick={openAdd} disabled={actionLoading}>
           <Plus className="h-4 w-4" />
           Tambah Barang
         </Button>
@@ -233,14 +237,26 @@ function BarangContent() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              [...Array(5)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-12" /></TableCell>
+                  <TableCell className="text-center"><Skeleton className="h-5 w-16 mx-auto rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : barang.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <PackageOpen className="h-10 w-10 mb-2" />
                     <p className="font-medium">Tidak ada data barang</p>
                     <p className="text-sm">
-                      {search || filterKategori !== "semua" || filterStatus !== "semua"
+                      {search || filterKategori || filterStatus
                         ? "Coba ubah filter pencarian"
                         : "Klik \"Tambah Barang\" untuk menambahkan"}
                     </p>
@@ -248,7 +264,7 @@ function BarangContent() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((item) => (
+              barang.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-mono text-xs">{item.kode}</TableCell>
                   <TableCell className="font-medium">{item.nama}</TableCell>
@@ -319,8 +335,9 @@ function BarangContent() {
             <Button
               variant="destructive"
               onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
+              disabled={actionLoading}
             >
-              Hapus
+              {actionLoading ? "Menghapus..." : "Hapus"}
             </Button>
           </div>
         </DialogContent>

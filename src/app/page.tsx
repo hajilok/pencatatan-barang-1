@@ -1,9 +1,10 @@
 "use client"
 
-import { useBarangStore } from "@/data/store"
+import { useDashboard } from "@/hooks/use-barang"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Package,
   AlertTriangle,
@@ -38,13 +39,6 @@ function relativeTime(dateStr: string): string {
   return `${Math.floor(days / 30)} bulan lalu`
 }
 
-const ringkasanCards = [
-  { key: "total", label: "Total Barang", icon: Package, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950" },
-  { key: "menipis", label: "Stok Menipis", icon: AlertTriangle, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950" },
-  { key: "habis", label: "Stok Habis", icon: XCircle, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950" },
-  { key: "kategori", label: "Kategori", icon: Layers, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-950" },
-]
-
 const aksiIcons: Record<string, typeof ArrowUpRight> = {
   "Barang Masuk": ArrowDownRight,
   "Barang Baru": Plus,
@@ -60,16 +54,49 @@ const aksiColors: Record<string, string> = {
 }
 
 export default function DashboardPage() {
-  const store = useBarangStore()
-  const total = store.getBarangCount()
-  const menipis = store.getMenipisCount()
-  const habis = store.getHabisCount()
-  const kategori = store.getKategoriCount()
-  const totalNilai = store.getTotalNilai()
+  const { data, isLoading, isError } = useDashboard()
 
-  const values: Record<string, number> = { total, menipis, habis, kategori }
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64 mt-1" />
+          </div>
+          <Skeleton className="h-9 w-36" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
+              <CardContent><Skeleton className="h-8 w-16" /></CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
-  const aktivitasTerbaru = store.aktivitas.slice(0, 5)
+  if (isError || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+        <h1 className="text-xl font-bold">Gagal Memuat Dashboard</h1>
+        <p className="text-muted-foreground text-sm mb-4">
+          Terjadi kesalahan saat mengambil data.
+        </p>
+        <Button onClick={() => window.location.reload()}>Coba Lagi</Button>
+      </div>
+    )
+  }
+
+  const ringkasanCards = [
+    { key: "total", label: "Total Barang", icon: Package, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950", value: data.totalBarang },
+    { key: "menipis", label: "Stok Menipis", icon: AlertTriangle, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950", value: data.stokMenipis },
+    { key: "habis", label: "Stok Habis", icon: XCircle, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950", value: data.stokHabis },
+    { key: "kategori", label: "Kategori", icon: Layers, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-950", value: data.kategoriCount },
+  ]
 
   return (
     <div className="space-y-6">
@@ -88,7 +115,6 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Ringkasan Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {ringkasanCards.map((card) => (
           <Card key={card.key}>
@@ -99,31 +125,28 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{values[card.key]}</div>
+              <div className="text-2xl font-bold">{card.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Stok per Kategori */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-base">Stok per Kategori</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {["Elektronik", "ATK", "Furnitur"].map((kat) => {
-                const items = store.barang.filter((b) => b.kategori === kat)
-                const totalStok = items.reduce((s, b) => s + b.stok, 0)
-                const maxStok = Math.max(...store.barang.map(b => b.stok), 1)
-                const width = Math.round((totalStok / (maxStok * 3)) * 100)
+              {Object.entries(data.stokPerKategori).map(([kat, info]) => {
+                const allStok = Object.values(data.stokPerKategori).reduce((s, v) => s + v.stok, 0)
+                const width = allStok > 0 ? Math.round((info.stok / allStok) * 100) : 0
                 return (
                   <div key={kat} className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span className="font-medium">{kat}</span>
                       <span className="text-muted-foreground">
-                        {items.length} jenis · {totalStok} unit
+                        {info.jenis} jenis · {info.stok} unit
                       </span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted">
@@ -135,24 +158,28 @@ export default function DashboardPage() {
                   </div>
                 )
               })}
+              {Object.keys(data.stokPerKategori).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Belum ada data kategori
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Nilai Inventaris */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Nilai Inventaris</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2 mb-4">
-              <span className="text-3xl font-bold">{formatRupiah(totalNilai)}</span>
+              <span className="text-3xl font-bold">{formatRupiah(data.nilaiInventaris)}</span>
               <span className="text-sm text-muted-foreground">total nilai stok</span>
             </div>
             <Separator className="my-4" />
             <div className="space-y-3">
               <h4 className="text-sm font-medium">Aktivitas Terakhir</h4>
-              {aktivitasTerbaru.map((aktivitas) => {
+              {data.aktivitasTerbaru.map((aktivitas) => {
                 const Icon = aksiIcons[aktivitas.aksi] ?? TrendingUp
                 return (
                   <div key={aktivitas.id} className="flex items-center justify-between text-sm">
@@ -175,7 +202,7 @@ export default function DashboardPage() {
                   </div>
                 )
               })}
-              {aktivitasTerbaru.length === 0 && (
+              {data.aktivitasTerbaru.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Belum ada aktivitas
                 </p>

@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Barang {
+  id            String      @id @default(uuid())
+  kode          String      @unique
+  nama          String
+  kategori      String
+  stok          Int         @default(0)
+  satuan        String
+  harga         Int         @default(0)
+  deskripsi     String      @default("")
+  status        String      @default("Tersedia")
+  lokasi        String
+  tanggalMasuk  DateTime    @default(now())
+  tanggalUpdate DateTime    @updatedAt
+  aktivitas     Aktivitas[]
+}
+
+model Kategori {
+  id           String @id @default(uuid())
+  nama         String @unique
+  jumlahBarang Int    @default(0)
+}
+
+model Aktivitas {
+  id         String   @id @default(uuid())
+  barangId   String
+  barangNama String
+  aksi       String
+  jumlah     Int
+  tanggal    DateTime @default(now())
+  keterangan String   @default("")
+  barang     Barang   @relation(fields: [barangId], references: [id], onDelete: Cascade)
+}
