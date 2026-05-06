@@ -30,22 +30,30 @@ export function AppSidebar() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  function isActive(href: string) {
+    if (href === "/") return pathname === "/"
+    return pathname.startsWith(href)
+  }
+
   const links = (
     <nav className="flex flex-col gap-1 px-3 py-4">
-      {navItems.map((item) => (
+      {navItems.map((item) => {
+        const active = isActive(item.href)
+        return (
         <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
           <Button
-            variant={pathname === item.href ? "secondary" : "ghost"}
+            variant={active ? "secondary" : "ghost"}
             className={cn(
               "w-full justify-start gap-3",
-              pathname === item.href && "bg-secondary font-medium"
+              active && "bg-secondary font-medium"
             )}
           >
             <item.icon className="h-4 w-4" />
             {item.title}
           </Button>
-        </Link>
-      ))}
+          </Link>
+        )
+      })}
     </nav>
   )
 
